@@ -1,126 +1,168 @@
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class CommandManager : MonoBehaviour
-{
-    //コマンドの総数
-    [SerializeField] int  m_commandNum = default;
-    //コマンドのリスト
-    int[] m_commandList1;
-    int[] m_commandList2;
+{    
+    [SerializeField] KeyCode m_keyUp = default;
+    [SerializeField] KeyCode m_keyRight = default;
+    [SerializeField] KeyCode m_keyDown = default;
+    [SerializeField] KeyCode m_keyLeft = default;
 
-    //今入力すべきコマンド
-    int m_commandNow1 = 0;
-    int m_commandNow2 = 0;
-    //コマンド入力した数
-    int m_slashCount1 = 0;
-    int m_slashCount2 = 0;
+    [SerializeField] GameObject m_boxObject = default;
+    [SerializeField] Vector2 m_firstBoxPosition = default;
+    [SerializeField] float m_boxDistance = default;
 
-    GameObject m_commandText = default;
+    GameManager m_gameManager;
+    Color m_colorUp;
+    Color m_colorRight;
+    Color m_colorDown;
+    Color m_colorLeft;
 
-    [SerializeField] Color m_colorUp = default;
-    [SerializeField] Color m_colorRight = default;
-    [SerializeField] Color m_colorDown = default;
-    [SerializeField] Color m_colorLeft = default;
-    //GameObject m_commandBoxes1 = default;
+    ScoreManager m_scoreManager;
 
-    [SerializeField] float m_timer = default;
+    GameObject[] m_boxes = new GameObject[4];
+    
+    public int[] m_commandPlayer;
+    int m_commandNow = 0;
+    int[] m_nextCommand = new int[4];
+    public int m_score = 0;
+   
 
     // Start is called before the first frame update
     void Start()
     {
-        m_commandList1 = new int[m_commandNum];
-        m_commandList2 = new int[m_commandNum];
+        var sm = GameObject.Find("ScoreManager");
+        m_scoreManager = sm.GetComponent<ScoreManager>();
+        //m_scoreManager.AddScore();
 
-        for (int i = 0; i < m_commandNum; i++)
+        var gm = GameObject.Find("GameManager");
+        m_gameManager = gm.GetComponent<GameManager>();
+        m_commandPlayer = new int[m_gameManager.m_commandNum];
+
+        //コマンドボックスを生成
+        for (int i = 0; i < 4; i++)
         {
-            m_commandList1[i] = Random.Range(0, 4);
-            m_commandList2[i] = m_commandList1[i] + 2;
+            Vector3 boxPosition = new Vector3(0f, 0f, 0f);
+            boxPosition.x = m_firstBoxPosition.x + m_boxDistance * i;
+            boxPosition.y = m_firstBoxPosition.y;
+
+            m_boxes[i] = Instantiate(m_boxObject, boxPosition, Quaternion.identity);
+            m_boxes[i].GetComponent<SpriteRenderer>().enabled = false;
+
+            m_nextCommand[i] = i;
         }
 
-        m_commandText = GameObject.Find("CommandText");
-        //m_commandBoxes1 = GameObject.Find("CommandBoxes1");
+        //色を設定
+        m_colorUp = m_gameManager.m_colorUp;
+        m_colorRight = m_gameManager.m_colorRight;
+        m_colorDown = m_gameManager.m_colorDown;
+        m_colorLeft = m_gameManager.m_colorLeft;
+
+        
     }
 
     // Update is called once per frame
     void Update()
     {
-        //string cText = $"{m_commandList1[m_commandNow1]} {m_commandList1[m_commandNow1 + 1]} {m_commandList1[m_commandNow1 + 2]} {m_commandList1[m_commandNow1 + 3]} {m_commandList1[m_commandNow1 + 4]} {m_commandList1[m_commandNow1 + 5]} {m_commandList1[m_commandNow1 + 6]}" +
-        //    $"\nslashCount {m_slashCount1}";
-        //m_commandText.GetComponent<Text>().text = cText;
-        //string cText = $"slashCount {m_slashCount1}";
-        //m_commandText.GetComponent<Text>().text = cText;
-
-        //var cb1sr = m_commandBoxes1.GetComponentsInChildren<SpriteRenderer>();
-        //var cb1trans = m_commandBoxes1.GetComponentsInChildren<Transform>();
-        var cb1sr = this.GetComponentsInChildren<SpriteRenderer>();
-        var cb1trans = this.GetComponentsInChildren<Transform>();
-
-        for (int i = 0; i <= 6; i++)
+        if (m_gameManager.m_gamePlaying)
         {
-            if (m_commandList1[m_commandNow1 + i] % 4 == 0)
+            for (int i = 0; i < 4; i++)
             {
-                cb1sr[i].color = m_colorUp;
-                cb1trans[i + 1].eulerAngles = new Vector3(0, 0, 0);
+                m_boxes[i].GetComponent<SpriteRenderer>().enabled = true;
             }
-            else if (m_commandList1[m_commandNow1 + i] % 4 == 1)
+
+            CommandBoxUpdate();
+
+            if (CommandEntered())
             {
-                cb1sr[i].color = m_colorRight;
-                cb1trans[i + 1].eulerAngles = new Vector3(0, 0, 270);
+                m_commandNow++;
+                if (m_commandNow > 99)
+                {
+                    m_commandNow = 0;
+                }
+                m_score++;
+                m_scoreManager.AddScore();
+
             }
-            else if (m_commandList1[m_commandNow1 + i] % 4 == 2)
+        }
+    }
+
+    void CommandBoxUpdate()
+    {
+        for (int i = 0; i < m_nextCommand.Length; i++)
+        {
+            m_nextCommand[i]++;
+            
+            if (m_nextCommand[i] > 99)
             {
-                cb1sr[i].color = m_colorDown;
-                cb1trans[i + 1].eulerAngles = new Vector3(0, 0, 180);
-            }
-            else if (m_commandList1[m_commandNow1 + i] % 4 == 3)
-            {
-                cb1sr[i].color = m_colorLeft;
-                cb1trans[i + 1].eulerAngles = new Vector3(0, 0, 90);
+                m_nextCommand[i] = 0;
             }
         }
 
-        Debug.Log(Time.time);
-        if (Time.time <= m_timer)
+        //コマンドボックスを更新
+        for (int i = 0; i < 4; i++)
         {
-            if (Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                if (m_commandList1[m_commandNow1] % 4 == 0)
-                {
-                    m_commandNow1++;
-                    m_slashCount1++;
-                }
-            }
+            var boxSR = m_boxes[i].GetComponent<SpriteRenderer>();
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (m_commandPlayer[m_commandNow + i] % 4 == 0)
             {
-                if (m_commandList1[m_commandNow1] % 4 == 1)
-                {
-                    m_commandNow1++;
-                    m_slashCount1++;
-                }
+                m_boxes[i].transform.eulerAngles = new Vector3(0, 0, 0);
+                boxSR.color = m_colorUp;
             }
+            else if (m_commandPlayer[m_commandNow + i] % 4 == 1)
+            {
+                m_boxes[i].transform.eulerAngles = new Vector3(0, 0, 270);
+                boxSR.color = m_colorRight;
+            }
+            else if (m_commandPlayer[m_commandNow + i] % 4 == 2)
+            {
+                m_boxes[i].transform.eulerAngles = new Vector3(0, 0, 180);
+                boxSR.color = m_colorDown;
+            }
+            else if (m_commandPlayer[m_commandNow + i] % 4 == 3)
+            {
+                m_boxes[i].transform.eulerAngles = new Vector3(0, 0, 90);
+                boxSR.color = m_colorLeft;
+            }
+        }
+    }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+    bool CommandEntered()
+    {
+        //正しいキーが入力されたら
+        if (Input.GetKeyDown(m_keyUp) && m_commandPlayer[m_commandNow] % 4 == 0)
+        {
+            if (!Input.GetKeyDown(m_keyRight) && !Input.GetKeyDown(m_keyDown) && !Input.GetKeyDown(m_keyLeft))
             {
-                if (m_commandList1[m_commandNow1] % 4 == 2)
-                {
-                    m_commandNow1++;
-                    m_slashCount1++;
-                }
+                return true;
             }
+        }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+        if (Input.GetKeyDown(m_keyRight) && m_commandPlayer[m_commandNow] % 4 == 1)
+        {
+            if (!Input.GetKeyDown(m_keyUp) && !Input.GetKeyDown(m_keyDown) && !Input.GetKeyDown(m_keyLeft))
             {
-                if (m_commandList1[m_commandNow1] % 4 == 3)
-                {
-                    m_commandNow1++;
-                    m_slashCount1++;
-                }
+                return true;
             }
-        }        
+        }
+
+        if (Input.GetKeyDown(m_keyDown) && m_commandPlayer[m_commandNow] % 4 == 2)
+        {
+            if (!Input.GetKeyDown(m_keyUp) && !Input.GetKeyDown(m_keyRight) && !Input.GetKeyDown(m_keyLeft))
+            {
+                return true;
+            }
+        }
+
+        if (Input.GetKeyDown(m_keyLeft) && m_commandPlayer[m_commandNow] % 4 == 3)
+        {
+            if (!Input.GetKeyDown(m_keyUp) && !Input.GetKeyDown(m_keyRight) && !Input.GetKeyDown(m_keyDown))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
